@@ -1,0 +1,481 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>ダーツゲーム｜Single HTML</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;600;800&display=swap" rel="stylesheet">
+  <style>
+    :root{
+      --bg1: 255, 255, 255;
+      --bg2: 15, 18, 30;
+      --card: 255,255,255;
+      --accent: 76,110,245; /* indigo */
+      --muted: 160,168,190;
+      --green: 28,166,76;
+      --red: 210,31,60;
+      --single-dark: 17,17,17;
+      --single-light: 247,247,245;
+      --shadow: 3,7,20;
+    }
+
+    html,body{
+      height:100%;
+      margin:0;
+      font-family: 'Noto Sans JP', system-ui, -apple-system, Segoe UI, Roboto, "Hiragino Kaku Gothic ProN", Meiryo, sans-serif;
+      color: rgba(var(--card),0.95);
+      background: radial-gradient(1200px 800px at 10% 10%, rgba(76,110,245,.28), transparent 60%),
+                  radial-gradient(1200px 900px at 90% 80%, rgba(47,184,150,.28), transparent 60%),
+                  linear-gradient(180deg, rgb(var(--bg2)) 0%, rgb(8,10,18) 100%);
+    }
+
+    .wrapper{
+      max-width: 1100px;
+      margin: 40px auto;
+      padding: 0 16px;
+    }
+
+    .header{
+      display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:16px;
+    }
+    .title{
+      font-weight:800; font-size: clamp(22px, 3vw, 32px);
+      letter-spacing:.02em;
+      color: #fff;
+    }
+    .subtitle{ color: rgba(255,255,255,.7); font-size:14px }
+
+    .app{
+      display:grid; grid-template-columns: 1.1fr .9fr; gap: 18px;
+    }
+
+    @media (max-width: 880px){
+      .app{ grid-template-columns: 1fr; }
+    }
+
+    .card{
+      background: linear-gradient(180deg, rgba(255,255,255,.08), rgba(255,255,255,.03));
+      border: 1px solid rgba(255,255,255,.12);
+      box-shadow: 0 10px 30px rgba(var(--shadow), .45), inset 0 1px 0 rgba(255,255,255,.08);
+      border-radius: 22px; padding: 16px; backdrop-filter: blur(10px);
+    }
+
+    .board-wrap{ position: relative; display:flex; align-items:center; justify-content:center; height: 560px; }
+    canvas{ width: 520px; height: 520px; border-radius:50%; display:block; }
+    .hint{
+      position:absolute; bottom:10px; left:50%; transform:translateX(-50%);
+      font-size:12px; color: rgba(255,255,255,.7);
+      background: rgba(0,0,0,.25); padding:6px 10px; border-radius: 999px;
+      border: 1px solid rgba(255,255,255,.16);
+    }
+
+    .controls{ display:grid; gap: 12px; }
+
+    .row{ display:flex; gap:10px; align-items:center; }
+    label{ font-size: 13px; color: rgba(255,255,255,.8); width: 80px; }
+    select, button, input[type="text"]{
+      appearance:none; -webkit-appearance:none; outline:none;
+      background: rgba(255,255,255,.08);
+      border: 1px solid rgba(255,255,255,.16);
+      color:#fff; padding:10px 12px; border-radius: 12px; font-size:14px;
+    }
+    button{ cursor:pointer; font-weight:600; letter-spacing:.02em; }
+    .btn-accent{ background: linear-gradient(180deg, rgba(var(--accent),.9), rgba(var(--accent),.75)); border: 1px solid rgba(var(--accent),.5); }
+
+    .kpi{
+      display:grid; grid-template-columns: repeat(3, 1fr); gap:10px; margin-top: 6px;
+    }
+    .kpi .item{ background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.12); padding: 12px; border-radius: 14px; text-align:center; }
+    .kpi .label{ font-size:12px; color: rgba(255,255,255,.7) }
+    .kpi .value{ font-size:22px; font-weight:800; letter-spacing:.02em; }
+
+    .history{ margin-top: 12px; max-height: 230px; overflow:auto; }
+    .history table{ width:100%; border-collapse: collapse; font-size:14px; }
+    .history th, .history td{ padding:8px 10px; border-bottom: 1px dashed rgba(255,255,255,.12); text-align:center; color: rgba(255,255,255,.9) }
+    .history th{ position: sticky; top:0; background: rgba(0,0,0,.25); backdrop-filter: blur(6px); }
+
+    .toast{ position: fixed; inset:auto 16px 16px auto; background: rgba(0,0,0,.65); color:#fff; padding:10px 14px; border-radius: 12px; font-size:14px; border:1px solid rgba(255,255,255,.12); display:none; }
+
+    .legend{ display:flex; gap:8px; align-items:center; justify-content:center; margin-top:8px; font-size:12px; color: rgba(255,255,255,.75) }
+    .dot{ width:10px; height:10px; border-radius:50%; display:inline-block }
+    .dot.green{ background: rgb(var(--green)) }
+    .dot.red{ background: rgb(var(--red)) }
+    .dot.gray{ background: rgba(255,255,255,.75) }
+
+    @media (prefers-reduced-motion: no-preference){
+      .pop{ animation: pop .4s ease-out }
+      @keyframes pop{ from{ transform: scale(.9); opacity: 0 } to{ transform: scale(1); opacity:1 } }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrapper">
+    <div class="header">
+      <div>
+        <div class="title">🎯 ダーツゲーム</div>
+        <div class="subtitle">ボードをクリックして3投×ターンで得点しよう（301/501/練習モード）。</div>
+      </div>
+      <div class="row">
+        <button id="btnReset">リセット</button>
+      </div>
+    </div>
+
+    <div class="app">
+      <section class="card">
+        <div class="board-wrap">
+          <canvas id="board" width="520" height="520" aria-label="ダーツボード" role="img"></canvas>
+          <div class="hint">クリックでスロー / Z:一手戻す / R:リセット</div>
+        </div>
+        <div class="legend">
+          <span class="dot green"></span>ダブル/トリプル（緑）
+          <span class="dot red"></span>ダブル/トリプル（赤）
+          <span class="dot gray"></span>シングル
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="controls">
+          <div class="row">
+            <label for="mode">モード</label>
+            <select id="mode">
+              <option value="practice">練習（合計加算のみ）</option>
+              <option value="301">301</option>
+              <option value="501" selected>501</option>
+            </select>
+          </div>
+          <div class="row">
+            <label for="player">プレイヤー名</label>
+            <input id="player" type="text" placeholder="名前（任意）" />
+          </div>
+          <div class="row">
+            <button id="btnUndo">一手戻す (Z)</button>
+            <button id="btnNext" class="btn-accent">次のターン</button>
+          </div>
+
+          <div class="kpi">
+            <div class="item"><div class="label">残り（または合計）</div><div id="kpiRemain" class="value">501</div></div>
+            <div class="item"><div class="label">このターン</div><div id="kpiTurn" class="value">0</div></div>
+            <div class="item"><div class="label">残りダーツ</div><div id="kpiDarts" class="value">3</div></div>
+          </div>
+
+          <div class="history">
+            <table>
+              <thead>
+                <tr><th>ターン</th><th>投げた場所</th><th>得点</th><th>合計/残り</th></tr>
+              </thead>
+              <tbody id="histBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script>
+  // ====== 基本設定 ======
+  const SECTORS = [20,1,18,4,13,6,10,15,2,17,3,19,7,16,8,11,14,9,12,5]; // 上(12時)から時計回り
+
+  // 実寸ボード(直径=340mm, ダブル外=170mm)を基準に比率を設定
+  const RATIOS = {
+    R: 1.0,                 // ダブル外側（ボード外周）
+    doubleInner: 160/170,   // ダブル内周
+    tripleOuter: 107/170,   // トリプル外周
+    tripleInner: 99/170,    // トリプル内周
+    bullOuter: 31.8/170,    // アウターブル
+    bullInner: 12.7/170     // インナーブル
+  };
+
+  const canvas = document.getElementById('board');
+  const ctx = canvas.getContext('2d');
+  const DPR = Math.max(1, window.devicePixelRatio || 1);
+
+  // 物理ピクセルで高解像度化
+  function setupCanvas(){
+    const cssSize = 520; // CSS上のサイズ
+    canvas.style.width = cssSize + 'px';
+    canvas.style.height = cssSize + 'px';
+    canvas.width = Math.floor(cssSize * DPR);
+    canvas.height = Math.floor(cssSize * DPR);
+    ctx.setTransform(DPR,0,0,DPR,0,0); // 座標はCSSピクセル基準
+  }
+
+  const CENTER = { x: 260, y: 260 };
+  const BOARD_R = 240; // CSS px（おおよそ）
+
+  let state = {
+    mode: '501',
+    startScore: 501,
+    remain: 501,
+    turnScore: 0,
+    dartsLeft: 3,
+    throws: [], // 現在ターンの投擲 [{x,y,score,txt}]
+    history: [], // [{turn, list:[txt,...], delta, remainOrTotal}]
+    total: 0,
+  };
+
+  // ====== 描画 ======
+  function drawBoard(){
+    ctx.clearRect(0,0,canvas.width, canvas.height);
+
+    // 外周の柔らかい影
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(CENTER.x, CENTER.y, BOARD_R+10, 0, Math.PI*2);
+    ctx.fillStyle = 'rgba(0,0,0,.35)';
+    ctx.fill();
+    ctx.restore();
+
+    // 背景円
+    fillCircle(CENTER.x, CENTER.y, BOARD_R, 'rgba(240,240,244,1)');
+
+    // セクターの塗り分け関数
+    function drawRing(innerRatio, outerRatio, colorA, colorB){
+      const rIn = BOARD_R * innerRatio;
+      const rOut = BOARD_R * outerRatio;
+      for(let i=0;i<20;i++){
+        const start = (-90 + i*18) * Math.PI/180;
+        const end = (-90 + (i+1)*18) * Math.PI/180;
+        ctx.beginPath();
+        ctx.arc(CENTER.x, CENTER.y, rOut, start, end);
+        ctx.arc(CENTER.x, CENTER.y, rIn, end, start, true);
+        ctx.closePath();
+        ctx.fillStyle = (i%2===0) ? colorA : colorB;
+        ctx.fill();
+      }
+    }
+
+    // シングル外（トリプル外〜ダブル内）
+    drawRing(RATIOS.tripleOuter, RATIOS.doubleInner, 'rgb(22,22,22)', 'rgb(247,247,245)');
+
+    // ダブルリング（ダブル内〜外）
+    drawRing(RATIOS.doubleInner, RATIOS.R, `rgb(${getVar('--green')})`, `rgb(${getVar('--red')})`);
+
+    // シングル内（ブル外〜トリプル内）
+    drawRing(RATIOS.bullOuter, RATIOS.tripleInner, 'rgb(247,247,245)', 'rgb(22,22,22)');
+
+    // トリプルリング（トリプル内〜外）
+    drawRing(RATIOS.tripleInner, RATIOS.tripleOuter, `rgb(${getVar('--green')})`, `rgb(${getVar('--red')})`);
+
+    // アウターブル（25）
+    fillCircle(CENTER.x, CENTER.y, BOARD_R*RATIOS.bullOuter, `rgb(${getVar('--green')})`);
+    // インナーブル（50）
+    fillCircle(CENTER.x, CENTER.y, BOARD_R*RATIOS.bullInner, `rgb(${getVar('--red')})`);
+
+    // 目盛り線（セパレーター）
+    ctx.save();
+    ctx.strokeStyle = 'rgba(0,0,0,.35)';
+    ctx.lineWidth = 1;
+    for(let i=0;i<20;i++){
+      const a = (-90 + i*18) * Math.PI/180;
+      ctx.beginPath();
+      ctx.moveTo(CENTER.x + Math.cos(a)*BOARD_R, CENTER.y + Math.sin(a)*BOARD_R);
+      ctx.lineTo(CENTER.x + Math.cos(a)*(BOARD_R*RATIOS.bullOuter), CENTER.y + Math.sin(a)*(BOARD_R*RATIOS.bullOuter));
+      ctx.stroke();
+    }
+    ctx.restore();
+
+    // セクター数字（外周）
+    ctx.save();
+    ctx.fillStyle = '#111';
+    ctx.font = '600 16px "Noto Sans JP", system-ui';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    for(let i=0;i<20;i++){
+      const num = SECTORS[i];
+      const a = (-90 + i*18 + 9) * Math.PI/180; // セクター中央
+      const r = BOARD_R*1.06;
+      ctx.save();
+      ctx.translate(CENTER.x + Math.cos(a)*r, CENTER.y + Math.sin(a)*r);
+      ctx.rotate(a + Math.PI/2);
+      ctx.fillText(String(num), 0, 0);
+      ctx.restore();
+    }
+    ctx.restore();
+
+    // 既存のヒットマーカー
+    drawMarkers();
+  }
+
+  function fillCircle(x,y,r,color){
+    ctx.beginPath(); ctx.arc(x,y,r,0,Math.PI*2); ctx.fillStyle = color; ctx.fill();
+  }
+
+  const markers = []; // {x,y}
+  function drawMarkers(){
+    markers.forEach(m=>{
+      ctx.save();
+      ctx.shadowColor = 'rgba(0,0,0,.35)';
+      ctx.shadowBlur = 6;
+      fillCircle(m.x, m.y, 4.5, '#fff');
+      ctx.restore();
+      fillCircle(m.x, m.y, 2, '#333');
+    });
+  }
+
+  function getVar(name){
+    return getComputedStyle(document.documentElement).getPropertyValue(name).trim().replace(/[, ]+/g, ',');
+  }
+
+  // ====== スコア計算 ======
+  function scoreAt(x,y){
+    const dx = x - CENTER.x; const dy = y - CENTER.y;
+    const r = Math.hypot(dx,dy);
+    const angleFromTop = (Math.atan2(dy,dx) * 180/Math.PI + 90 + 360) % 360; // 0°が上
+    const sectorIndex = Math.floor(angleFromTop / 18) % 20;
+    const base = SECTORS[sectorIndex];
+
+    if(r > BOARD_R) return {score:0, label:'MISS'};
+    if(r <= BOARD_R*RATIOS.bullInner) return {score:50, label:'INNER BULL 50'};
+    if(r <= BOARD_R*RATIOS.bullOuter) return {score:25, label:'OUTER BULL 25'};
+
+    // リング判定
+    let mult = 1; let tag = 'S';
+    if(r >= BOARD_R*RATIOS.doubleInner) { mult = 2; tag = 'D'; }
+    else if(r >= BOARD_R*RATIOS.tripleInner && r <= BOARD_R*RATIOS.tripleOuter){ mult = 3; tag = 'T'; }
+    else { mult = 1; tag = 'S'; }
+
+    return { score: base*mult, label: `${tag}${base}` };
+  }
+
+  // ====== ゲーム進行 ======
+  function setMode(mode){
+    state.mode = mode;
+    state.startScore = (mode==='301'||mode==='501') ? Number(mode) : 0;
+    state.remain = state.startScore || 0;
+    state.total = 0;
+    state.turnScore = 0;
+    state.dartsLeft = 3;
+    state.throws = [];
+    state.history = [];
+    markers.length = 0;
+    drawBoard();
+    updateUI();
+  }
+
+  function addThrow(px,py){
+    const {score, label} = scoreAt(px,py);
+    markers.push({x:px,y:py});
+
+    if(state.mode==='practice'){
+      state.total += score;
+      state.turnScore += score;
+    }else{
+      // シンプルルール：残りがマイナスになる投擲は0点（加算しない）
+      const nextRemain = state.remain - score;
+      if(nextRemain < 0){
+        // 0点扱い
+      }else{
+        state.remain = nextRemain;
+        state.turnScore += score;
+      }
+      if(state.remain === 0){
+        toast('CLEAR! ぴったりゼロになりました🎉');
+      }
+    }
+
+    state.throws.push({x:px,y:py,score,label});
+    state.dartsLeft = Math.max(0, state.dartsLeft - 1);
+    drawBoard();
+    updateUI();
+  }
+
+  function endTurn(){
+    const list = state.throws.map(t=>t.label).join(', ');
+    const delta = state.turnScore;
+    const remainOrTotal = (state.mode==='practice') ? state.total : state.remain;
+    const turnNo = state.history.length + 1;
+    state.history.push({turn: turnNo, list, delta, remainOrTotal});
+
+    // 次ターン準備
+    state.turnScore = 0;
+    state.dartsLeft = 3;
+    state.throws = [];
+    markers.length = 0; // ターンで刺さった目印はリセット
+    drawBoard();
+    updateUI();
+  }
+
+  function undo(){
+    if(state.throws.length===0) return;
+    const last = state.throws.pop();
+    markers.pop();
+
+    if(state.mode==='practice'){
+      state.total -= last.score;
+      state.turnScore -= last.score;
+    }else{
+      // シンプルルールで加点していた分だけ戻す
+      const nextRemain = state.remain + last.score;
+      // ただし「残りがマイナスだったから0点」というケースは、turnScoreに加算されていないので、
+      // state.throws から逆算できない。ここでは「実際に加算されていたら戻す」という挙動にする。
+      // 判定は、turnScoreにlast.scoreが含まれていたかで疑似的に判断
+      if(state.turnScore - last.score >= 0){
+        state.turnScore -= last.score;
+        state.remain = nextRemain;
+      }
+      if(state.remain > state.startScore) state.remain = state.startScore;
+    }
+    state.dartsLeft = Math.min(3, state.dartsLeft + 1);
+    drawBoard();
+    updateUI();
+  }
+
+  function updateUI(){
+    const kRemain = document.getElementById('kpiRemain');
+    const kTurn = document.getElementById('kpiTurn');
+    const kDarts = document.getElementById('kpiDarts');
+    const body = document.getElementById('histBody');
+
+    kRemain.textContent = (state.mode==='practice') ? state.total : state.remain;
+    kTurn.textContent = state.turnScore;
+    kDarts.textContent = state.dartsLeft;
+
+    body.innerHTML = state.history.map(h=>
+      `<tr><td>${h.turn}</td><td>${h.list||'-'}</td><td>${h.delta}</td><td>${h.remainOrTotal}</td></tr>`
+    ).join('');
+  }
+
+  function toast(msg){
+    const el = document.getElementById('toast');
+    el.textContent = msg; el.style.display='block'; el.classList.add('pop');
+    setTimeout(()=>{ el.style.display='none'; el.classList.remove('pop'); }, 1800);
+  }
+
+  // ====== 入力処理 ======
+  function getCanvasPos(evt){
+    const rect = canvas.getBoundingClientRect();
+    const x = (evt.clientX - rect.left);
+    const y = (evt.clientY - rect.top);
+    return {x, y}; // CSS px基準（ctxはDPR変換済み）
+  }
+
+  canvas.addEventListener('click', (e)=>{
+    if(state.dartsLeft<=0){ toast('このターンは3投までです。次のターンへ。'); return; }
+    const p = getCanvasPos(e);
+    addThrow(p.x, p.y);
+  });
+
+  document.getElementById('btnNext').addEventListener('click', endTurn);
+  document.getElementById('btnUndo').addEventListener('click', ()=>{ undo(); toast('一手戻しました'); });
+  document.getElementById('btnReset').addEventListener('click', ()=>{ setMode(state.mode); toast('リセットしました'); });
+
+  document.getElementById('mode').addEventListener('change', (e)=>{
+    setMode(e.target.value);
+  });
+
+  document.addEventListener('keydown', (e)=>{
+    if(e.key==='z' || e.key==='Z'){ undo(); }
+    if(e.key==='r' || e.key==='R'){ setMode(state.mode); }
+  });
+
+  // ====== 初期化 ======
+  setupCanvas();
+  drawBoard();
+  setMode('501');
+  </script>
+</body>
+</html>
